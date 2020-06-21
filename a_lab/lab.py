@@ -1,44 +1,60 @@
+# custom exception 
 class EvaluationError(Exception):
     pass
 
 # splits a program into its tokens 
 def tokenize(program):
-    # split program into lines to deal with comments 
+    # split program into lines to handle comments 
     program_lines = program.split('\n')
     # removing comments
     for cur_index, line in enumerate(program_lines):
         if ';' in line:
             program_lines[cur_index] = line[:line.index(';')]
+    # recombining lines into single string
     single_program = ' '.join(program_lines)
+    # spacing parentheses to help with parsing
     return single_program.replace('(', ' ( ').replace(')', ' ) ').split()
 
+# determines if function is valid
 def is_valid_parse(tokens):
+    # counter for open parentheses - close parentheses
     open_p = 0
     for token in tokens:
         if token == '(':
             open_p += 1
         elif token == ')':
             open_p -= 1
+        # if ever more close parentheses, invalid
         if open_p < 0:
             return False
     return open_p == 0
 
+# splits tokens into sub environments
+# assumes valid program
 def parsing(tokens):
     initial_token = tokens.pop(0)
+    # if token is single value
     if not tokens:
+        # if numerical value
         try:
+            # decimal value
             if '.' in initial_token:
                 cur_num = float(initial_token)
+            # int value
             else:
                 cur_num = int(initial_token)
             return cur_num
         except:
             return initial_token
-
+    # current environment 
     cur_list = []
+    # continue parsing until end of current environment
     while tokens[0] != ')':
+        # beginning of new subenvironment
         if tokens[0] == '(':
+            # append parsed subenvironment
             cur_list.append(parsing(tokens))
+        # continuously add components of current environment to parsed list
         else:
             cur_token = tokens.pop(0)
             try:
@@ -49,10 +65,14 @@ def parsing(tokens):
                 cur_list.append(cur_num)
             except:
                 cur_list.append(cur_token)
+    # remove close parentheses
     tokens.pop(0)
+    # return parsed list of current environment
     return cur_list
 
+# parse container function
 def parse(tokens):
+    # raise error if invalid program
     if not is_valid_parse(tokens):
         raise SyntaxError
     return parsing(tokens)
@@ -82,6 +102,7 @@ def div(args):
             temp /= val
         return temp
 
+# base operator dictionary
 carlae_builtins = {
     '+': sum,
     '-': sub,
@@ -93,23 +114,26 @@ carlae_builtins = {
 ~~~~~~~~~~~~~~~~~~~~~~~~~ HELPER CLASSES ~~~~~~~~~~~~~~~~~~~~~~~~~
 '''
 
+# representation of environments 
 class Environment():
     def __init__(self, parent = carlae_builtins):
+        # parent environments for recursive symbol retrieval
         self.parent = parent
+        # symbols defined in current env
         self.symbols = {}
 
+    # defining symbol in current env
     def __setitem__(self, key, val):
         self.symbols[key] = val
     
+    # retrieving value of symbol
     def __getitem__(self, key):
-        # check current symbol table
+        # check current env's symbol table
         if key in self.symbols:
             return self.symbols[key]
-
-        # check parent env if not carlae_builtins
+        # check parent env if is not carlae_builtins
         elif self.parent != carlae_builtins:
             return self.parent[key]
-
         # check carlae_builtins
         else:
             if key in carlae_builtins:
@@ -117,24 +141,34 @@ class Environment():
             else:
                 raise EvaluationError
 
-    def __str__(self):
-        return str(self.symbols)
-
+# representation of function information
 class Lambda():
     def __init__(self, params, function, env):
+        # list of parameters for function
         self.params = params
+        # code for execution of function
         self.function = function
+        # env where function was defined
         self.env = env
 
+    # calling functions
     def __call__(self, params):
-        cur_env = Environment(self.env)
+        # if number of params is not correct
         if len(self.params) != len(params):
             raise EvaluationError
+        # temporary environment for parameter name mapping
+        cur_env = Environment(self.env)
+        # mapping parameters to function passed arguments
         for i, var in enumerate(self.params):
             cur_env[var] = params[i]
+        # calling function in sub environment
         return result_and_env(self.function, cur_env)[0]
 
+''' 
+~~~~~~~~~~~~~~~~~~~~~~~~~ EVALUATION FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~
+'''     
 
+# evaluates expression
 def result_and_env(parsed, env = None):
     if not env:
         env = Environment()
@@ -184,20 +218,16 @@ def result_and_env(parsed, env = None):
 
     return operation(operands), env
 
-
+# wrapper function
 def evaluate(parsed, env = None):
     return result_and_env(parsed, env)[0]
 
-
-# '''
-# for repl/testing 
+# for REPL/testing 
 if __name__ == '__main__':
+    # defining global environment
     env = Environment()
-    file_name = 'test.txt'
-    file = open(file_name, 'r')
-    file_program = file.read()
-    # print('test output: ', evaluate(parse(tokenize(file_program))), env)
 
+    # REPL environment
     while True:
         try:
             program = input('in:\n')
@@ -205,19 +235,6 @@ if __name__ == '__main__':
                 break
             else:
                 value = evaluate(parse(tokenize(program)), env)
-                # value = parse(tokenize(program))
                 print('out:\n', value, '\n')
         except:
             print('out:\ninvalid program\n')
-
-# '''
-
-
-# program = open('test.txt').read()
-# print'original program: ', program
-# print parse(tokenize(program))
-
-
-
-
-
