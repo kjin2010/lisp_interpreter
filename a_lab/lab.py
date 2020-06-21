@@ -102,72 +102,94 @@ class Environment():
         self.symbols[key] = val
     
     def __getitem__(self, key):
-        # if key in current environment
+        # check current symbol table
         if key in self.symbols:
             return self.symbols[key]
-        # if key in carlae_builtins
-        elif key in carlae_builtins:
-            return carlae_builtins[key]
-        # if not in parents
-        elif parent == carlae_builtins:
+
+        # check parent env if not carlae_builtins
+        elif self.parent != carlae_builtins:
+            return self.parent[key]
+
+        # check carlae_builtins
+        else:
+            if key in carlae_builtins:
+                return carlae_builtins[key]
+            else:
+                raise EvaluationError
+
+    def __str__(self):
+        return str(self.symbols)
+
+class Lambda():
+    def __init__(self, params, function, env):
+        self.params = params
+        self.function = function
+        self.env = env
+
+    def __call__(self, params):
+        cur_env = Environment(self.env)
+        if len(self.params) != len(params):
             raise EvaluationError
-        # check parents 
-        return self.parent[key]
+        for i, var in enumerate(self.params):
+            cur_env[var] = params[i]
+        return result_and_env(self.function, cur_env)[0]
 
-    def set(self, key, value):
-        if key not in self.symbols:
-            a = 5
-
-def is_valid_eval(parsed):
-    a = 6
 
 def result_and_env(parsed, env = None):
     if not env:
         env = Environment()
 
-    # empty list means no program run
+    # empty expression
     if parsed == []:
         raise EvaluationError
-
-    # single value in expression [1 1.0]
+    # expression begins with value: [1 2]
     if isinstance(parsed, list) and (isinstance(parsed[0], int) or isinstance(parsed[0], float)):
-        raise EvaluationError 
-
-    # binding that doesn't exist
-    if isinstance(parsed, str) and parsed not in env.symbols:
         raise EvaluationError
-
-    # single value not in expression
+    # single value not in expression: 1
     if isinstance(parsed, int) or isinstance(parsed, float):
         return parsed, env
-
-    # binding 
+    # single value that is binded: val
     if isinstance(parsed, str):
         return env[parsed], env
 
+    # operation execution
+    first_term = parsed[0]
 
-    # executing operations
-    operation = parsed[0]
+    # variable definition
+    if first_term == 'define':
+        # easier function definition
+        if isinstance(parsed[1], list):
+            parsed[2] = ['lambda', parsed[1][1:], parsed[2]]
+            parsed[1] = parsed[1][0]
+            return result_and_env(parsed, env)
+        symbol = parsed[1]
+        val = result_and_env(parsed[2], env)[0]
+        env[symbol] = val
+        return val, env
 
-    if operation == 'define':
-        env[parsed[1]] = result_and_env(parsed[2], env)[0]
-        return env[parsed[1]], env
+    # function definition
+    if first_term == 'lambda':
+        return Lambda(parsed[1], parsed[2], env), env
 
+    # nested function calls
+    if isinstance(first_term, list):
+        env['temp_func'] = result_and_env(first_term, env)[0]
+        first_term = 'temp_func'
+
+    # simple operator in carlae_builtins
     operands = []
-    # evaluate subsequent expressions to perform function on
+    operation = env[first_term]
     for expression in parsed[1:]:
-        operands.append(evaluate(expression, env))
-    if operation in carlae_builtins:
-        return carlae_builtins[operation](operands), env
-    else:
-        print('undefined operation')
+        operands.append(result_and_env(expression, env)[0])
+
+    return operation(operands), env
 
 
 def evaluate(parsed, env = None):
     return result_and_env(parsed, env)[0]
 
 
-'''
+# '''
 # for repl/testing 
 if __name__ == '__main__':
     env = Environment()
@@ -182,18 +204,18 @@ if __name__ == '__main__':
             if program == 'quit':
                 break
             else:
-                # value = evaluate(parse(tokenize(program)), env)
-                value = parse(tokenize(program))
+                value = evaluate(parse(tokenize(program)), env)
+                # value = parse(tokenize(program))
                 print('out:\n', value, '\n')
         except:
             print('out:\ninvalid program\n')
 
-'''
+# '''
 
 
 # program = open('test.txt').read()
 # print'original program: ', program
-# print evaluate(parse(tokenize(program)))
+# print parse(tokenize(program))
 
 
 
