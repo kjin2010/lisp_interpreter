@@ -1,3 +1,5 @@
+import sys
+
 # custom exception 
 class EvaluationError(Exception):
     pass
@@ -393,6 +395,12 @@ def result_and_env(parsed, env = None):
                 return False, env
         return True, env
 
+    # begin function
+    if first_term == 'begin':
+        for expression in parsed[1:]:
+            last_val = evaluate(expression, env)
+        return last_val, env
+
     # or statement
     # not in carlae_builtin for short circuiting
     if first_term == 'or':
@@ -414,12 +422,22 @@ def result_and_env(parsed, env = None):
 def evaluate(parsed, env = None):
     return result_and_env(parsed, env)[0]
 
+# reading from file
+def evaluate_file(file_name, env = None):
+    my_file = open(file_name, 'r')
+    program = my_file.read()
+    my_file.close()
+    return result_and_env(parse(tokenize(program)), env)[0]
+
 # '''
 
 # for REPL/testing 
 if __name__ == '__main__':
     # defining global environment
     env = Environment()
+
+    for file_name in sys.argv[1:]:
+        evaluate_file(file_name, env)
 
     # REPL environment
     while True:
