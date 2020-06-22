@@ -133,41 +133,70 @@ def not_op(args):
 
 def list_init(args):
     if args == []:
-        return List('None', 'None')
-    next = list_init(args[1:])
-    return List(args[0], next)
+        return None
+    next_list = list_init(args[1:])
+    return LinkedList(args[0], next_list)
 
 def car(args):
-    if args[0].elt == 'None':
-        print('hi')
+    if args[0] == None:
         raise EvaluationError
     return args[0].elt
 
 def cdr(args):
-    if args[0].elt == 'None':
+    if args[0] == None:
         raise EvaluationError
-    return args[0].next_node
+    return args[0].next
 
 def list_len(args):
+    if not args[0]:
+        return 0
     return len(args[0])
 
 def elt_at_ind(args):
     my_list = args[0]
     index = args[1]
-    if my_list.elt == 'None':
+    if my_list == None:
         raise EvaluationError
     return my_list[index]
 
 def concatenate(args):
     if args == []:
-        return List('None', 'None')
-    first_list = args[0]
+        return None
     if len(args) == 1:
-        return List(first_list.elt, first_list.next_node)
+        return LinkedList(args[0].elt, args[0].next)
     else:
-        for concat_list in args[1:]:
-            first_list.concat(concat_list)
-        return first_list
+        head = LinkedList('None', None)
+        for concat_list in args:
+            if concat_list == None:
+                continue
+            temp_list = concat_list.dup()
+            head.concat(temp_list)
+        return head
+
+def map_fun(args):
+    func = args[0]
+    params = args[1]
+    out_list = LinkedList('None', None)
+    for x in params:
+        out_list.concat(list_init([func([x])]))
+    return out_list
+
+def filter_fun(args):
+    func = args[0]
+    params = args[1]
+    out_list = LinkedList('None', None)
+    for x in params:
+        if func([x]):
+            out_list.concat(list_init([x]))
+    return out_list
+
+def reduce_fun(args):
+    func = args[0]
+    params = args[1]
+    out_val = args[2]
+    for x in params:
+        out_val = func([out_val, x])
+    return out_val
 
 # base operator dictionary
 carlae_builtins = {
@@ -189,7 +218,9 @@ carlae_builtins = {
     'length': list_len,
     'elt-at-index': elt_at_ind,
     'concat': concatenate,
-
+    'map': map_fun,
+    'filter': filter_fun,
+    'reduce': reduce_fun,
 
 }
 
@@ -248,53 +279,58 @@ class Function():
         return result_and_env(self.function, cur_env)[0]
 
 # representation of lists
-class List():
-    def __init__(self, elt, next_node):
+class LinkedList():
+    def __init__(self, elt, next):
         self.elt = elt
-        self.next_node = next_node
+        self.next = next
 
     def concat(self, new_list):
         if self.elt == 'None':
             self.elt = new_list.elt
-            self.next_node = new_list.next_node
+            self.next = new_list.next
         else:
             my_tail = self.get_tail()
-            my_tail.next_node = new_list
+            my_tail.next = new_list
 
     def get_tail(self):
         current = self
-        if current.elt == 'None':
+        if current.next == None:
             return self
-        while current.next_node.elt != 'None':
-            current = current.next_node
+        while current.next != None:
+            current = current.next
         return current
+
+    def dup(self):
+        if self.elt == 'None':
+            return LinkedList('None', None)
+        cur_elt = self.elt
+        next_list = None if self.next == None else self.next.dup()
+        return LinkedList(cur_elt, next_list)
 
     def __iter__(self):
         current = self
-        while current.elt != 'None':
+        while current != None:
             yield current.elt
-            current = current.next_node
+            current = current.next
 
     def __getitem__(self, index):
         current = self
         if len(self) == 0 or index >= len(self) or index < 0:
             raise EvaluationError
         for i in range(index):
-            current = current.next_node
+            current = current.next
         return current.elt
 
     def __len__(self):
         counter = 0
         current = self
-        while current.elt != 'None':
+        while current != None:
             counter += 1
-            current = current.next_node
+            current = current.next
         return counter
 
     def __str__(self):
         return str(list(self))
-
-
 
 ''' 
 ~~~~~~~~~~~~~~~~~~~~~~~~~ EVALUATION FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -414,4 +450,3 @@ if __name__ == '__main__':
 
 # total_list = [my_a, my_b, my_c, my_d]
 # print(concatenate(total_list))
-
