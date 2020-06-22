@@ -131,6 +131,42 @@ def less_than_equal(args):
 def not_op(args):
     return not args[0]
 
+def list_init(args):
+    if args == []:
+        return 'None'
+    next = list_init(args[1:])
+    return List(args[0], next)
+
+def car(args):
+    if args[0] == 'None':
+        raise EvaluationError
+    return args[0].elt
+
+def cdr(args):
+    if args[0] == 'None':
+        raise EvaluationError
+    return args[0].next_node
+
+def list_len(args):
+    return len(args[0])
+
+def elt_at_ind(args):
+    my_list = args[0]
+    index = args[1]
+    if my_list == 'None':
+        raise EvaluationError
+    return my_list[index]
+
+def concatenate(args):
+    for i, my_list in enumerate(args):
+        if my_list != 'None':
+            first_ind, first_list = i, my_list
+            break
+    for concat_list in args[i + 1:]:
+        if concat_list != 'None':
+            first_list.concat(concat_list)
+    return first_list
+
 # base operator dictionary
 carlae_builtins = {
     '+': sum,
@@ -145,6 +181,13 @@ carlae_builtins = {
     'not': not_op,
     '#t': True,
     '#f': False,
+    'list': list_init,
+    'car': car,
+    'cdr': cdr,
+    'length': list_len,
+    'elt-at-index': elt_at_ind,
+    'concat': concatenate,
+
 
 }
 
@@ -180,7 +223,7 @@ class Environment():
                 raise EvaluationError
 
 # representation of function information
-class Function():
+class Function():  
     def __init__(self, params, function, env):
         # list of parameters for function
         self.params = params
@@ -201,6 +244,50 @@ class Function():
             cur_env[var] = params[i]
         # calling function in sub environment
         return result_and_env(self.function, cur_env)[0]
+
+# representation of lists
+class List():
+    def __init__(self, elt, next_node):
+        self.elt = elt
+        self.next_node = next_node
+
+    def concat(self, new_list):
+        my_tail = self.get_tail()
+        my_tail.next_node = new_list
+
+    def get_tail(self):
+        current = self
+        while current.next_node != 'None':
+            current = current.next_node
+        return current
+
+    def __iter__(self):
+        current = self
+        while current != 'None':
+            yield current.elt
+            current = current.next_node
+
+    def __getitem__(self, index):
+        current = self
+        if index >= len(self) or index < 0:
+            raise EvaluationError
+        while index > 0:
+            current = current.next_node
+            index -= 1
+        return current.elt
+
+    def __len__(self):
+        counter = 0
+        current = self
+        while current != 'None':
+            counter += 1
+            current = current.next_node
+        return counter
+
+    def __str__(self):
+        return str(list(self))
+
+
 
 ''' 
 ~~~~~~~~~~~~~~~~~~~~~~~~~ EVALUATION FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -308,3 +395,17 @@ if __name__ == '__main__':
 # program = open('text.txt').read()
 # print'original program: ', program
 # print evaluate(parse(tokenize(program)))
+
+# a_list = [1, 2, 3, 4, 5]
+# b_list = [6, 7, 8, 9, 10]
+# c_list = []
+# d_list = [11, 12, 13, 14, 15]
+# my_a = list_init(a_list)
+# my_b = list_init(b_list)
+# my_c = list_init(c_list)
+# my_d = list_init(d_list)
+
+# total_list = [my_c, my_a, my_b, my_c, my_d]
+# print(concatenate(total_list))
+
+
