@@ -56,9 +56,9 @@ def parsing(tokens):
     cur_list = []
     # continue parsing until end of current environment
     while tokens[0] != ')':
-        # beginning of new subenvironment
+        # beginning of new subexpression
         if tokens[0] == '(':
-            # append parsed subenvironment
+            # append parsed subexpression
             cur_list.append(parsing(tokens))
         # continuously add components of current environment to parsed list
         else:
@@ -162,22 +162,26 @@ def elt_at_ind(args):
     return my_list[index]
 
 def concatenate(args):
+    # empty list
     if args == []:
         return None
+    # single list
     if len(args) == 1:
-        return LinkedList(args[0].elt, args[0].next)
+        return args[0].copy()
     else:
+        # fake empty list for concat compatibility
         head = LinkedList('None', None)
         for concat_list in args:
+            # skip empty lists
             if concat_list == None:
                 continue
-            temp_list = concat_list.dup()
-            head.concat(temp_list)
+            head.concat(concat_list)
         return head
 
 def map_fun(args):
     func = args[0]
     params = args[1]
+    # fake empty list for concat compatibility
     out_list = LinkedList('None', None)
     for x in params:
         out_list.concat(list_init([func([x])]))
@@ -186,6 +190,7 @@ def map_fun(args):
 def filter_fun(args):
     func = args[0]
     params = args[1]
+    # fake empty list for concat compatibility
     out_list = LinkedList('None', None)
     for x in params:
         if func([x]):
@@ -223,7 +228,6 @@ carlae_builtins = {
     'map': map_fun,
     'filter': filter_fun,
     'reduce': reduce_fun,
-
 }
 
 ''' 
@@ -283,17 +287,24 @@ class Function():
 # representation of lists
 class LinkedList():
     def __init__(self, elt, next):
+        # current value
         self.elt = elt
+        # pointer to next list node
         self.next = next
 
+    # concatenation function
     def concat(self, new_list):
+        # custom case for concatenating to empty list
         if self.elt == 'None':
             self.elt = new_list.elt
             self.next = new_list.next
+        # adding copy to tail
         else:
             my_tail = self.get_tail()
-            my_tail.next = new_list
+            my_tail.next = new_list.copy()
 
+    # returns tail of list 
+    # assumes non-empty list
     def get_tail(self):
         current = self
         if current.next == None:
@@ -302,19 +313,23 @@ class LinkedList():
             current = current.next
         return current
 
-    def dup(self):
+    # returns duplicate of current list
+    # used in concatenation
+    def copy(self):
         if self.elt == 'None':
             return LinkedList('None', None)
         cur_elt = self.elt
-        next_list = None if self.next == None else self.next.dup()
+        next_list = None if self.next == None else self.next.copy()
         return LinkedList(cur_elt, next_list)
 
+    # ensures iterability
     def __iter__(self):
         current = self
         while current != None:
             yield current.elt
             current = current.next
 
+    # simplifies recursive symbol fetching
     def __getitem__(self, index):
         current = self
         if len(self) == 0 or index >= len(self) or index < 0:
@@ -323,6 +338,7 @@ class LinkedList():
             current = current.next
         return current.elt
 
+    # length of list
     def __len__(self):
         counter = 0
         current = self
@@ -330,9 +346,6 @@ class LinkedList():
             counter += 1
             current = current.next
         return counter
-
-    def __str__(self):
-        return str(list(self))
 
 ''' 
 ~~~~~~~~~~~~~~~~~~~~~~~~~ EVALUATION FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -391,24 +404,56 @@ def result_and_env(parsed, env = None):
     if first_term == 'and':
         for expression in parsed[1:]:
             valid = result_and_env(expression, env)[0]
+            # short circuit check
             if not valid:
                 return False, env
         return True, env
-
-    # begin function
-    if first_term == 'begin':
-        for expression in parsed[1:]:
-            last_val = evaluate(expression, env)
-        return last_val, env
 
     # or statement
     # not in carlae_builtin for short circuiting
     if first_term == 'or':
         for expression in parsed[1:]:
             valid = result_and_env(expression, env)[0]
+            # short circuit check
             if valid:
                 return True, env
         return False, env
+
+    # begin expression
+    if first_term == 'begin':
+        for expression in parsed[1:]:
+            last_val = evaluate(expression, env)
+        return last_val, env
+
+    # let expression
+    if first_term == 'let':
+        # list of vars and values
+        bounded = parsed[1]
+        # body to be evaluated and returned
+        body = parsed[2]
+        # creating subenvironment
+        sub_env = Environment(env)
+        for var in bounded:
+            # updating values in subenvironment
+            sub_env[var[0]] = result_and_env(var[1], sub_env)[0]
+        return result_and_env(body, sub_env)[0], env
+
+    # set! expression
+    if first_term == 'set!':
+        var_name = parsed[1]
+        new_val = result_and_env(parsed[2], env)[0]
+        cur_env = env
+        # checking all parent envs until no more or in current env
+        while cur_env != carlae_builtins and var_name not in cur_env.symbols:
+            cur_env = cur_env.parent
+        # raise error if not in cur_env
+        if cur_env == carlae_builtins:
+            raise EvaluationError
+        # set value in cur_env
+        else:
+            cur_env[var_name] = new_val
+            return new_val, env
+
 
     # simple operator in carlae_builtins
     operands = []
@@ -429,7 +474,9 @@ def evaluate_file(file_name, env = None):
     my_file.close()
     return result_and_env(parse(tokenize(program)), env)[0]
 
-# '''
+''' 
+~~~~~~~~~~~~~~~~~~~~~~~~~ REPL AND FILE LOADING ~~~~~~~~~~~~~~~~~~~~~~~~~
+'''     
 
 # for REPL/testing 
 if __name__ == '__main__':
@@ -450,21 +497,3 @@ if __name__ == '__main__':
                 print('out:\n', value, '\n')
         except:
             print('out:\ninvalid program\n')
-
-# '''
-
-# program = open('text.txt').read()
-# print'original program: ', program
-# print evaluate(parse(tokenize(program)))
-
-# a_list = [1, 2, 3, 4, 5]
-# b_list = [6, 7, 8, 9, 10]
-# c_list = []
-# d_list = [11, 12, 13, 14, 15]
-# my_a = list_init(a_list)
-# my_b = list_init(b_list)
-# my_c = list_init(c_list)
-# my_d = list_init(d_list)
-
-# total_list = [my_a, my_b, my_c, my_d]
-# print(concatenate(total_list))
