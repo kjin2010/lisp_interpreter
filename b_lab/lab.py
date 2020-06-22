@@ -133,17 +133,18 @@ def not_op(args):
 
 def list_init(args):
     if args == []:
-        return 'None'
+        return List('None', 'None')
     next = list_init(args[1:])
     return List(args[0], next)
 
 def car(args):
-    if args[0] == 'None':
+    if args[0].elt == 'None':
+        print('hi')
         raise EvaluationError
     return args[0].elt
 
 def cdr(args):
-    if args[0] == 'None':
+    if args[0].elt == 'None':
         raise EvaluationError
     return args[0].next_node
 
@@ -153,19 +154,20 @@ def list_len(args):
 def elt_at_ind(args):
     my_list = args[0]
     index = args[1]
-    if my_list == 'None':
+    if my_list.elt == 'None':
         raise EvaluationError
     return my_list[index]
 
 def concatenate(args):
-    for i, my_list in enumerate(args):
-        if my_list != 'None':
-            first_ind, first_list = i, my_list
-            break
-    for concat_list in args[i + 1:]:
-        if concat_list != 'None':
+    if args == []:
+        return List('None', 'None')
+    first_list = args[0]
+    if len(args) == 1:
+        return List(first_list.elt, first_list.next_node)
+    else:
+        for concat_list in args[1:]:
             first_list.concat(concat_list)
-    return first_list
+        return first_list
 
 # base operator dictionary
 carlae_builtins = {
@@ -252,34 +254,39 @@ class List():
         self.next_node = next_node
 
     def concat(self, new_list):
-        my_tail = self.get_tail()
-        my_tail.next_node = new_list
+        if self.elt == 'None':
+            self.elt = new_list.elt
+            self.next_node = new_list.next_node
+        else:
+            my_tail = self.get_tail()
+            my_tail.next_node = new_list
 
     def get_tail(self):
         current = self
-        while current.next_node != 'None':
+        if current.elt == 'None':
+            return self
+        while current.next_node.elt != 'None':
             current = current.next_node
         return current
 
     def __iter__(self):
         current = self
-        while current != 'None':
+        while current.elt != 'None':
             yield current.elt
             current = current.next_node
 
     def __getitem__(self, index):
         current = self
-        if index >= len(self) or index < 0:
+        if len(self) == 0 or index >= len(self) or index < 0:
             raise EvaluationError
-        while index > 0:
+        for i in range(index):
             current = current.next_node
-            index -= 1
         return current.elt
 
     def __len__(self):
         counter = 0
         current = self
-        while current != 'None':
+        while current.elt != 'None':
             counter += 1
             current = current.next_node
         return counter
@@ -405,7 +412,6 @@ if __name__ == '__main__':
 # my_c = list_init(c_list)
 # my_d = list_init(d_list)
 
-# total_list = [my_c, my_a, my_b, my_c, my_d]
+# total_list = [my_a, my_b, my_c, my_d]
 # print(concatenate(total_list))
-
 
